@@ -6,9 +6,12 @@
 
 - 已完成：独立 Linux 目录、只读 ATVV 设备探测器、公开兼容边界；
 - 已增加：ATVV 语音会话到 vinput 的最小桥接，按下时从 `opening` 开始录音，释放或断连时停止；另保留 F9 键盘注入兼容模式，见 [`voice-f9-bridge/README.md`](voice-f9-bridge/README.md)；
+- 已增加：小米遥控器的 XInput2 按键桥接，方向键/确定键默认回注原生按键，菜单键作为 Super，电源键单击回注 `/`，TV+左右切换当前输出的 i3 workspace；实现见 [`remote-keymap/`](remote-keymap/)；
+- 已增加：本地按键映射配置界面，运行 `python3 linux/remote-keymap/ui/server.py` 后访问 `http://127.0.0.1:8765/`，保存后自动导出运行时配置并重载按键服务，也可从应用菜单打开“小米遥控器按键映射”；
 - 针对 HoldToTalk 遥控器增加 ATVVoice 补丁：忽略长按期间重复的 `START_SEARCH`，只用 `AUDIO_STOP(HttButtonRelease)` 结束会话；补丁说明见 [`atvvoice-patches/hold-to-talk-repeat-start-search.md`](atvvoice-patches/hold-to-talk-repeat-start-search.md)；
 - 待完成：将 ATVVoice 依赖纳入稳定安装/用户服务流程，并完成真实语音文字验收；
 - 不改变：遥控器方向键与确定键的原生 HID 行为；
+- 安全边界：桥接只独占名为 `小米蓝牙语音遥控器` 的 XInput 设备，不接管笔记本自身的 ACPI 电源键；
 - 兼容状态：候选，尚未完成当前小米遥控器的真实语音验收。
 
 ## 依赖

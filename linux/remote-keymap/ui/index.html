@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>小米遥控器 · 按键映射</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="设置导航">
+      <div class="brand-mark" aria-hidden="true">⌁</div>
+      <div class="brand-name">小米遥控器</div>
+      <nav>
+        <button class="nav-item active" type="button" aria-current="page">
+          <span class="nav-icon">▦</span><span>按键</span>
+        </button>
+        <button class="nav-item" type="button" disabled>
+          <span class="nav-icon">▱</span><span>组合动作</span>
+        </button>
+        <button class="nav-item" type="button" disabled>
+          <span class="nav-icon">▥</span><span>统计</span>
+        </button>
+        <button class="nav-item" type="button" disabled>
+          <span class="nav-icon">▤</span><span>回瞥</span>
+        </button>
+        <button class="nav-item" type="button" disabled>
+          <span class="nav-icon">⌘</span><span>连接</span>
+        </button>
+        <button class="nav-item" type="button" disabled>
+          <span class="nav-icon">▢</span><span>权限</span>
+        </button>
+      </nav>
+      <div class="sidebar-bottom">
+        <button class="nav-item" type="button" disabled>
+          <span class="nav-icon">ⓘ</span><span>关于</span>
+        </button>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">LINUX / I3</p>
+          <h1>按键映射</h1>
+          <p class="subtitle">为当前连接的小米蓝牙语音遥控器配置按键行为</p>
+        </div>
+        <div class="header-actions">
+          <div class="device-pill" role="status">
+            <span class="status-dot" data-status-dot></span>
+            <div>
+              <strong data-device-name>小米蓝牙语音遥控器</strong>
+              <span data-service-status>正在检查服务…</span>
+            </div>
+            <span class="battery" data-battery>●</span>
+          </div>
+          <label class="toggle-label">
+            <span>启用自定义按键</span>
+            <input id="enabled-toggle" type="checkbox" checked>
+            <span class="toggle" aria-hidden="true"></span>
+          </label>
+        </div>
+      </header>
+
+      <section class="notice" aria-label="当前配置说明">
+        <span class="notice-icon">i</span>
+        <div><strong>Linux 桥接模式</strong><span>方向键和确定键默认回注原生按键；语音键保留给 F9 语音输入。点击任意动作框后可直接按键盘重定义。</span></div>
+        <span class="runtime-badge">本机保存</span>
+      </section>
+
+      <section class="mapping-layout" aria-label="遥控器按键映射">
+        <div class="mapping-column" id="left-column"></div>
+
+        <div class="remote-stage">
+          <div class="remote-shadow" aria-hidden="true"></div>
+          <div class="remote" aria-label="小米蓝牙遥控器示意图">
+            <div class="remote-top-line"></div>
+            <button class="remote-button power" type="button" data-button="power" aria-label="电源键">⏻</button>
+            <button class="remote-button voice" type="button" data-button="voice" aria-label="语音键">♩</button>
+            <div class="dpad" aria-hidden="true">
+              <span class="dpad-ring"></span><span class="dpad-center"></span>
+              <span class="dpad-arrow up">⌃</span><span class="dpad-arrow down">⌄</span>
+              <span class="dpad-arrow left">‹</span><span class="dpad-arrow right">›</span>
+            </div>
+            <button class="remote-button back" type="button" data-button="back" aria-label="返回键">‹</button>
+            <div class="volume-rail" aria-hidden="true"><span>＋</span><span>−</span></div>
+            <button class="remote-button home" type="button" data-button="home" aria-label="主页键">⌂</button>
+            <button class="remote-button menu" type="button" data-button="menu" aria-label="菜单键">≡</button>
+            <button class="remote-button tv" type="button" data-button="tv" aria-label="TV 键">TV</button>
+          </div>
+          <div class="stage-caption"><span class="stage-line"></span><span>点击卡片编辑映射</span><span class="stage-line"></span></div>
+        </div>
+
+        <div class="mapping-column" id="right-column"></div>
+      </section>
+
+      <footer class="action-bar">
+        <div class="save-state" role="status" aria-live="polite"><span class="save-dot"></span><span data-save-state>正在读取配置…</span></div>
+        <div class="action-buttons">
+          <button class="button secondary" id="reset-button" type="button">恢复当前默认</button>
+          <button class="button primary" id="save-button" type="button">保存配置</button>
+        </div>
+      </footer>
+    </main>
+  </div>
+  <dialog id="capture-dialog" aria-labelledby="capture-title">
+    <form method="dialog" class="capture-panel">
+      <div class="capture-head">
+        <div><p class="eyebrow">KEYBOARD CAPTURE</p><h2 id="capture-title">录入快捷键</h2><p data-capture-target>正在编辑按键动作</p></div>
+        <button class="dialog-close" value="cancel" aria-label="关闭录入窗口">×</button>
+      </div>
+      <div class="capture-display" data-capture-display tabindex="0">请直接按键盘上的单键或组合键</div>
+      <p class="capture-help">支持 Ctrl、Alt、Shift、Super 与方向键、F1–F12 等组合。按键完成后点击保存。</p>
+      <div class="preset-row" aria-label="常用动作预设">
+        <span>快速预设</span>
+        <button type="button" data-preset="native">保持原生</button>
+        <button type="button" data-preset="super">Super</button>
+        <button type="button" data-preset="chatgpt">ChatGPT</button>
+        <button type="button" data-preset="slash">/</button>
+        <button type="button" data-preset="none">清除</button>
+      </div>
+      <div class="capture-actions">
+        <button class="button secondary" value="cancel">取消</button>
+        <button class="button primary" value="save" data-capture-save>保存快捷键</button>
+      </div>
+    </form>
+  </dialog>
+  <script src="/app.js"></script>
+</body>
+</html>
