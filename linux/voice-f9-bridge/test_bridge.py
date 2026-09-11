@@ -1,6 +1,6 @@
 import unittest
 
-from bridge import F9BridgeState
+from bridge import F9BridgeState, safe_atvvoice_log
 
 
 class F9BridgeStateTests(unittest.TestCase):
@@ -26,6 +26,13 @@ class F9BridgeStateTests(unittest.TestCase):
         self.assertEqual(state.transition("opening"), ["keydown"])
         self.assertEqual(state.transition("not-a-state"), ["keyup"])
         self.assertFalse(state.pressed)
+
+    def test_atvvoice_logs_are_filtered_and_addresses_redacted(self):
+        self.assertIsNone(safe_atvvoice_log("Found ATVV device (C0:5D:39:C3:A0:C0)"))
+        self.assertEqual(
+            safe_atvvoice_log("AUDIO_START device=C0:5D:39:C3:A0:C0"),
+            "AUDIO_START device=<redacted-address>",
+        )
 
 
 if __name__ == "__main__":

@@ -15,6 +15,8 @@ from typing import Iterable
 
 
 MIC_STATE_RE = re.compile(r"\.MicStateChanged\s*\(\s*'([^']+)'")
+BLUETOOTH_ADDRESS_RE = re.compile(r"(?i)\b(?:[0-9a-f]{2}:){5}[0-9a-f]{2}\b")
+LOG_MARKERS = ("AUDIO_START", "AUDIO_STOP", "PipeWire source", "ERROR", "error", "failed")
 
 
 class F9BridgeState:
@@ -41,6 +43,13 @@ class F9BridgeState:
 def parse_mic_state(line: str) -> str | None:
     match = MIC_STATE_RE.search(line)
     return match.group(1) if match else None
+
+
+def safe_atvvoice_log(line: str) -> str | None:
+    """Keep useful lifecycle diagnostics without forwarding identity data."""
+    if not any(marker in line for marker in LOG_MARKERS):
+        return None
+    return BLUETOOTH_ADDRESS_RE.sub("<redacted-address>", line.rstrip())
 
 
 def send_key(action: str, key: str, dry_run: bool) -> None:
@@ -95,7 +104,9 @@ def terminate(process: subprocess.Popen[str] | None) -> None:
 
 def forward_logs(stream: Iterable[str]) -> None:
     for line in stream:
-        print(f"atvvoice {line.rstrip()}", flush=True)
+        safe_line = safe_atvvoice_log(line)
+        if safe_line is not None:
+            print(f"atvvoice {safe_line}", flush=True)
 
 
 def run(args: argparse.Namespace) -> int:
