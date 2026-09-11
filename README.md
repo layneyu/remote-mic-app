@@ -1,5 +1,7 @@
 # 无线麦
 
+> 本 fork 当前定位为「无线麦 SayAll 的 Manjaro/Linux 适配线」。macOS 版本继续保留；Linux 版本优先面向 Manjaro + i3，目标是让小米蓝牙语音遥控器通过 BlueZ/ATVV、PipeWire 和现有 F9 语音输入链路工作。
+
 [English](README.en.md)
 
 [官网](https://sayall.app/) · [配置教程](https://sayall.app/tutorial/)
@@ -25,6 +27,17 @@
   </tr>
 </table>
 
+## Manjaro/Linux 版本（适配中）
+
+Linux 适配从本 fork 独立的 `linux/` 目录开始，不会把 macOS Swift 工程伪装成跨平台构建。当前阶段已加入只读 ATVV 设备探测入口，用于确认遥控器的 BlueZ/GATT 能力；真实语音采集、PipeWire 虚拟麦克风和 F9 成对按键仍待本机实测。
+
+- 目标系统：Manjaro Linux、BlueZ、PipeWire、i3；
+- 普通方向键和确定键：保持遥控器原生 HID 行为；
+- 语音链路目标：遥控器 ATVV → ADPCM/PCM → PipeWire → F9 语音输入；
+- 当前状态：候选适配，不能宣称已经完成 Linux 语音兼容。
+
+入口和测试步骤见 [Linux 适配说明](linux/README.md) 与 [Manjaro 遥控器测试手册](Testing/LinuxManjaroRemote.md)。
+
 ## Windows 版本
 
 无线麦 App Windows 版本的第一个预览版已经发布，当前以基本功能为主：
@@ -47,7 +60,7 @@ Mac App 继续采用官网下载方式分发，Mac App Store 上架暂时暂停�
 
 **开口就输入，一键做更多，说过有回眸。**
 
-无线麦 SayAll 是一款 macOS 应用，可以把兼容的蓝牙语音遥控器变成 Mac 的无线麦。它先让语音输入随手可得，再把常用操作、不同 App 的键位方案和你主动保存的表达连接起来。
+无线麦 SayAll 的 macOS 发行线可以把兼容的蓝牙语音遥控器变成 Mac 的无线麦；本 fork 同时维护面向 Manjaro/Linux 的适配线。Linux 适配会复用公开的 ATVV 协议和 PipeWire 能力，但不会把尚未实测的设备或语音链路写成已兼容。
 
 无线麦使用 SwiftUI 原生开发，常驻运行时 CPU 占用率低于 0.5%，内存占用约 50 MB，比一个 Chrome 标签页还要轻量。
 
@@ -85,6 +98,7 @@ Mac App 继续采用官网下载方式分发，Mac App Store 上架暂时暂停�
 - Apple Silicon Mac（macOS 14 或更高版本），或 Intel Mac（macOS 13 或更高版本）；
 - 小米蓝牙遥控器 2 或 2 Pro；
 - 使用语音输入时，需要安装随安装包提供的兼容麦克风，或在 Mac 上已有 BlackHole 2ch 等回环音频设备。
+- Manjaro/Linux 适配要求见 [Linux 适配说明](linux/README.md)；当前仍属于候选实现。
 
 ## 下载与安装
 

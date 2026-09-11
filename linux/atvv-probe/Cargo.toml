@@ -1,0 +1,12 @@
+[package]
+name = "sayall-atvv-probe"
+version = "0.1.0"
+edition = "2021"
+description = "Read-only BlueZ ATVV capability probe for SayAll Linux adaptation"
+license = "GPL-3.0-only"
+
+[dependencies]
+anyhow = "1"
+bluer = { version = "0.17", features = ["bluetoothd"] }
+clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

@@ -1,5 +1,7 @@
 # SayAll
 
+> This fork is now also the Manjaro/Linux adaptation line for SayAll. The macOS release line remains available; Linux work targets Manjaro + i3 and connects the Xiaomi Bluetooth voice remote to the existing F9 voice-input path through BlueZ/ATVV and PipeWire.
+
 [简体中文](README.md)
 
 [Website](https://sayall.app/en/) · [Setup tutorial](https://sayall.app/en/tutorial/)
@@ -25,6 +27,17 @@
   </tr>
 </table>
 
+## Manjaro/Linux version (in progress)
+
+The Linux adaptation starts in the independent `linux/` directory. The macOS Swift project is not presented as a fake cross-platform build. The current increment adds a read-only ATVV device probe to verify the remote's BlueZ/GATT capability; real voice capture, a PipeWire virtual microphone, and paired F9 key events still require testing on the target machine.
+
+- Target: Manjaro Linux, BlueZ, PipeWire, and i3
+- Ordinary arrows and Center/Enter: preserve the remote's native HID behavior
+- Voice target: remote ATVV → ADPCM/PCM → PipeWire → F9 voice input
+- Status: adaptation candidate; Linux voice compatibility is not yet declared complete
+
+See [Linux adaptation notes](linux/README.md) and the [Manjaro remote test manual](Testing/LinuxManjaroRemote.md).
+
 ## Windows version
 
 The first Windows preview of SayAll is now available, focusing on the essential features:
@@ -47,7 +60,7 @@ The Mac app continues to be distributed directly. Mac App Store submission is pa
 
 **Speak to type. Press once to do more. Revisit what you said.**
 
-SayAll is a macOS app that turns a compatible Bluetooth voice remote into a wireless microphone for your Mac. It starts with effortless voice input, then connects common actions, app-specific button profiles, and the words you explicitly choose to keep.
+SayAll's macOS release line turns a compatible Bluetooth voice remote into a wireless microphone for Mac; this fork also maintains a Manjaro/Linux adaptation line. The Linux path reuses the public ATVV protocol and PipeWire, but does not label an untested device or voice path as compatible.
 
 SayAll is built natively with SwiftUI. While running in the background, it uses less than 0.5% CPU and around 50 MB of memory—lighter than a single Chrome tab.
 
@@ -85,6 +98,7 @@ After you enable Revisit, SayAll keeps only final text entered through SayAll an
 - Apple Silicon Mac with macOS 14 or later, or Intel Mac with macOS 13 or later
 - Xiaomi Bluetooth Remote 2 or 2 Pro
 - For voice input, install the compatible microphone included with the installer, or use an existing loopback device such as BlackHole 2ch.
+- For the Manjaro/Linux adaptation, see the [Linux adaptation notes](linux/README.md); it is currently a candidate implementation.
 
 ## Download and install
 

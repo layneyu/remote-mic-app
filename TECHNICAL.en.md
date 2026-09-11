@@ -8,12 +8,15 @@ This document is for developers, auditors, and release engineers. It describes t
 
 - Apple Silicon release line: arm64, macOS 14 or later
 - Intel release line: x86_64, macOS 13 or later
+- Manjaro/Linux adaptation line: isolated under `linux/`; the current increment is only an ATVV capability-probe candidate and does not declare voice compatibility complete
 - Target remote: Xiaomi Bluetooth Remote 2 Pro / RC003
 - HID identity: Vendor ID 0x2717, Product ID 0x32B8
 - Swift tools version: 6.2; the current release Mac uses Swift 6.3, with source compiled in Swift 5 language mode
 - Release signing: local development builds retain ad-hoc signing with a fixed designated requirement. Starting with v1.3.0, official releases use Developer ID Application and Developer ID Installer signing; the app and driver use the Hardened Runtime and trusted timestamps, while the app, both PKGs, and the DMG are notarized by Apple and stapled.
 
 The release lines use separate artifacts and update feeds: Apple Silicon keeps the default names and `appcast.xml`, while Intel uses names containing `Intel` and `appcast-intel.xml`. Build and verification scripts pin each architecture and minimum system version independently; no Universal package is produced.
+
+The Linux adaptation does not participate in the macOS SwiftPM, DMG, HAL-driver, or Apple release flow. Its voice target is BlueZ ATVV GATT, IMA/DVI ADPCM, a PipeWire virtual audio source, and the existing F9 voice-input path; ordinary HID arrows and Center/Enter remain native. Until the corresponding real-device Bluetooth, audio, key, and recovery matrix passes, Linux support remains a candidate.
 
 ## Localization
 

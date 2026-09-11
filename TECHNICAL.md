@@ -8,12 +8,15 @@
 
 - Apple Silicon 发行线：`arm64`、macOS 14 或更高版本；
 - Intel 发行线：`x86_64`、macOS 13 或更高版本；
+- Manjaro/Linux 适配线：独立位于 `linux/`，当前只提供 ATVV 能力探测候选，不代表已完成语音兼容；
 - 目标遥控器：小米蓝牙遥控器 2 Pro / RC003；
 - HID 标识：Vendor ID `0x2717`、Product ID `0x32B8`；
 - Swift tools version：6.2；发布机当前使用 Swift 6.3，源码以 Swift 5 语言模式编译；
 - 发布签名：本地开发构建保持带固定 designated requirement 的 ad-hoc 签名。自 v1.3.0 起的正式发布使用 Developer ID Application 与 Developer ID Installer 签名；应用和驱动启用 Hardened Runtime 与可信时间戳，应用、两个 PKG 和 DMG 都经过 Apple 公证并 stapled。
 
 两条发行线保持独立产物与更新源：Apple Silicon 使用默认文件名和 `appcast.xml`，Intel 使用带 `Intel` 的文件名和 `appcast-intel.xml`。构建与验证脚本分别固定目标架构和最低系统版本，不生成 Universal 包。
+
+Linux 适配不参与 macOS SwiftPM、DMG、HAL 驱动或 Apple 发布流程。Linux 语音目标是 BlueZ ATVV GATT、IMA/DVI ADPCM、PipeWire 虚拟音频源和现有 F9 语音输入；普通 HID 方向键与确定键保持原生。完成对应设备的真实蓝牙、音频、按键和异常恢复矩阵前，只能标记为候选。
 
 ## 模块结构
 
