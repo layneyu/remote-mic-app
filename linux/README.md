@@ -5,7 +5,8 @@
 ## 当前状态
 
 - 已完成：独立 Linux 目录、只读 ATVV 设备探测器、公开兼容边界；
-- 待完成：ATVV 语音会话、IMA/DVI ADPCM 解码、PipeWire 虚拟麦克风、语音键到 F9 的按下/释放桥接；
+- 已增加：ATVV 语音会话到 F9 的最小桥接，按下时从 `opening` 开始保持 F9，释放或断连时释放 F9；见 [`voice-f9-bridge/README.md`](voice-f9-bridge/README.md)；
+- 待完成：将 ATVVoice 依赖纳入稳定安装/用户服务流程，并完成真实语音文字验收；
 - 不改变：遥控器方向键与确定键的原生 HID 行为；
 - 兼容状态：候选，尚未完成当前小米遥控器的真实语音验收。
 
