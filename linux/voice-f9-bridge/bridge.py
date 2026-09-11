@@ -16,7 +16,16 @@ from typing import Iterable
 
 MIC_STATE_RE = re.compile(r"\.MicStateChanged\s*\(\s*'([^']+)'")
 BLUETOOTH_ADDRESS_RE = re.compile(r"(?i)\b(?:[0-9a-f]{2}:){5}[0-9a-f]{2}\b")
-LOG_MARKERS = ("AUDIO_START", "AUDIO_STOP", "PipeWire source", "ERROR", "error", "failed")
+LOG_MARKERS = (
+    "START_SEARCH",
+    "AUDIO_START",
+    "AUDIO_STOP",
+    "Frame timeout",
+    "PipeWire source",
+    "ERROR",
+    "error",
+    "failed",
+)
 
 
 class F9BridgeState:
