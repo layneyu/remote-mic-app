@@ -6,7 +6,7 @@
 
 - 已完成：独立 Linux 目录、只读 ATVV 设备探测器、公开兼容边界；
 - 已增加：ATVV 语音会话到 vinput 的最小桥接，按下时从 `opening` 开始录音，释放或断连时停止；另保留 F9 键盘注入兼容模式，见 [`voice-f9-bridge/README.md`](voice-f9-bridge/README.md)；
-- 针对 HoldToTalk 遥控器增加 ATVVoice 补丁：忽略长按期间重复的 `START_SEARCH`，只用 `AUDIO_STOP(HttButtonRelease)` 结束会话；补丁见 [`atvvoice-patches/hold-to-talk-repeat-start-search.patch`](atvvoice-patches/hold-to-talk-repeat-start-search.patch)；
+- 针对 HoldToTalk 遥控器增加 ATVVoice 补丁：忽略长按期间重复的 `START_SEARCH`，只用 `AUDIO_STOP(HttButtonRelease)` 结束会话；补丁说明见 [`atvvoice-patches/hold-to-talk-repeat-start-search.md`](atvvoice-patches/hold-to-talk-repeat-start-search.md)；
 - 待完成：将 ATVVoice 依赖纳入稳定安装/用户服务流程，并完成真实语音文字验收；
 - 不改变：遥控器方向键与确定键的原生 HID 行为；
 - 兼容状态：候选，尚未完成当前小米遥控器的真实语音验收。
