@@ -28,8 +28,8 @@ LOG_MARKERS = (
 )
 
 
-class F9BridgeState:
-    """Pure state machine for the remote voice key lifecycle.
+class VoiceInputState:
+    """Pure state machine for the remote voice input lifecycle.
 
     ATVVoice reports ``opening`` as soon as the remote's voice button is
     pressed, before the first audio packet arrives. Pressing F9 at that point
@@ -42,10 +42,10 @@ class F9BridgeState:
     def transition(self, state: str) -> list[str]:
         if state in {"opening", "streaming"} and not self.pressed:
             self.pressed = True
-            return ["keydown"]
-        if state != "streaming" and self.pressed:
+            return ["start"]
+        if state not in {"opening", "streaming"} and self.pressed:
             self.pressed = False
-            return ["keyup"]
+            return ["stop"]
         return []
 
 
@@ -61,18 +61,25 @@ def safe_atvvoice_log(line: str) -> str | None:
     return BLUETOOTH_ADDRESS_RE.sub("<redacted-address>", line.rstrip())
 
 
-def send_key(action: str, key: str, dry_run: bool) -> None:
-    command = ["xdotool", action, key]
-    print(f"key_event action={action} key={key}", flush=True)
+def input_command(action: str, mode: str, key: str) -> list[str]:
+    if mode == "direct":
+        return ["vinput", "recording", action]
+    keyboard_action = "keydown" if action == "start" else "keyup"
+    return ["xdotool", keyboard_action, key]
+
+
+def send_input(action: str, mode: str, key: str, dry_run: bool) -> None:
+    command = input_command(action, mode, key)
+    print(f"input_event action={action} mode={mode}", flush=True)
     if dry_run:
         return
     try:
         result = subprocess.run(command, check=False, capture_output=True, text=True)
     except OSError as exc:
-        raise RuntimeError(f"unable to execute xdotool: {exc}") from exc
+        raise RuntimeError(f"unable to execute input command: {exc}") from exc
     if result.returncode != 0:
         detail = result.stderr.strip() or f"exit={result.returncode}"
-        raise RuntimeError(f"xdotool {action} failed: {detail}")
+        raise RuntimeError(f"input command failed: {detail}")
 
 
 def wait_for_dbus(name: str, child: subprocess.Popen[str], timeout: float = 15.0) -> None:
@@ -126,6 +133,8 @@ def run(args: argparse.Namespace) -> int:
         )
     if "/" in binary and not os.access(binary, os.X_OK):
         raise RuntimeError(f"atvvoice executable is not available: {binary}")
+    if args.input_mode == "direct" and shutil.which("vinput") is None:
+        raise RuntimeError("vinput is not installed; use --input-mode keyboard or install vinput")
 
     command = [binary, "-vv", "--name", args.name]
     if args.device:
@@ -140,7 +149,7 @@ def run(args: argparse.Namespace) -> int:
         bufsize=1,
     )
     monitor: subprocess.Popen[str] | None = None
-    state = F9BridgeState()
+    state = VoiceInputState()
     try:
         if child.stderr is not None:
             import threading
@@ -170,10 +179,10 @@ def run(args: argparse.Namespace) -> int:
                 continue
             print(f"mic_state={mic_state}", flush=True)
             for action in state.transition(mic_state):
-                send_key(action, args.key, args.dry_run)
+                send_input(action, args.input_mode, args.key, args.dry_run)
     finally:
         if state.pressed:
-            send_key("keyup", args.key, args.dry_run)
+            send_input("stop", args.input_mode, args.key, args.dry_run)
         terminate(monitor)
         terminate(child)
     return 0
@@ -184,6 +193,12 @@ def main() -> int:
     parser.add_argument("--atvvoice-bin", help="path to the ATVVoice executable")
     parser.add_argument("-d", "--device", help="ATVV device address; omit to auto-discover")
     parser.add_argument("--name", default="xiaomi-remote", help="ATVVoice instance name")
+    parser.add_argument(
+        "--input-mode",
+        choices=("direct", "keyboard"),
+        default="direct",
+        help="directly control vinput (default) or inject F9 through X11",
+    )
     parser.add_argument("--key", default="F9", help="key to hold while the mic streams")
     parser.add_argument("--dry-run", action="store_true", help="log key events without sending them")
     args = parser.parse_args()

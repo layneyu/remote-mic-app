@@ -1,30 +1,31 @@
 import unittest
 
-from bridge import F9BridgeState, safe_atvvoice_log
+from bridge import VoiceInputState, input_command, safe_atvvoice_log
 
 
 class F9BridgeStateTests(unittest.TestCase):
     def test_opening_presses_f9_before_streaming_and_once_until_stream_ends(self):
-        state = F9BridgeState()
+        state = VoiceInputState()
 
-        self.assertEqual(state.transition("opening"), ["keydown"])
+        self.assertEqual(state.transition("opening"), ["start"])
+        self.assertEqual(state.transition("opening"), [])
         self.assertEqual(state.transition("streaming"), [])
         self.assertEqual(state.transition("streaming"), [])
-        self.assertEqual(state.transition("connected"), ["keyup"])
+        self.assertEqual(state.transition("connected"), ["stop"])
         self.assertEqual(state.transition("connected"), [])
 
     def test_disconnect_releases_a_stuck_key(self):
-        state = F9BridgeState()
+        state = VoiceInputState()
 
-        self.assertEqual(state.transition("streaming"), ["keydown"])
-        self.assertEqual(state.transition("disconnected"), ["keyup"])
+        self.assertEqual(state.transition("streaming"), ["start"])
+        self.assertEqual(state.transition("disconnected"), ["stop"])
 
     def test_unknown_states_are_safe(self):
-        state = F9BridgeState()
+        state = VoiceInputState()
 
         self.assertEqual(state.transition("not-a-state"), [])
-        self.assertEqual(state.transition("opening"), ["keydown"])
-        self.assertEqual(state.transition("not-a-state"), ["keyup"])
+        self.assertEqual(state.transition("opening"), ["start"])
+        self.assertEqual(state.transition("not-a-state"), ["stop"])
         self.assertFalse(state.pressed)
 
     def test_atvvoice_logs_are_filtered_and_addresses_redacted(self):
@@ -33,6 +34,10 @@ class F9BridgeStateTests(unittest.TestCase):
             safe_atvvoice_log("AUDIO_START device=C0:5D:39:C3:A0:C0"),
             "AUDIO_START device=<redacted-address>",
         )
+
+    def test_input_command_has_direct_and_keyboard_modes(self):
+        self.assertEqual(input_command("start", "direct", "F9"), ["vinput", "recording", "start"])
+        self.assertEqual(input_command("stop", "keyboard", "F9"), ["xdotool", "keyup", "F9"])
 
 
 if __name__ == "__main__":
