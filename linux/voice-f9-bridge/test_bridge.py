@@ -1,6 +1,12 @@
 import unittest
 
-from bridge import VoiceInputState, input_command, safe_atvvoice_log
+from bridge import (
+    DEFAULT_START_DELAY_MS,
+    VoiceInputState,
+    input_command,
+    safe_atvvoice_log,
+    start_delay_seconds,
+)
 
 
 class F9BridgeStateTests(unittest.TestCase):
@@ -38,6 +44,12 @@ class F9BridgeStateTests(unittest.TestCase):
     def test_input_command_has_direct_and_keyboard_modes(self):
         self.assertEqual(input_command("start", "direct", "F9"), ["vinput", "recording", "start"])
         self.assertEqual(input_command("stop", "keyboard", "F9"), ["xdotool", "keyup", "F9"])
+
+    def test_start_delay_is_milliseconds(self):
+        self.assertEqual(DEFAULT_START_DELAY_MS, 0)
+        self.assertEqual(start_delay_seconds(300), 0.3)
+        self.assertEqual(start_delay_seconds(0), 0.0)
+        self.assertEqual(start_delay_seconds(-1), 0.0)
 
 
 if __name__ == "__main__":

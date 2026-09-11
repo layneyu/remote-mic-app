@@ -10,6 +10,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import threading
 import time
 from typing import Iterable
 
@@ -23,9 +24,9 @@ LOG_MARKERS = (
     "Frame timeout",
     "PipeWire source",
     "ERROR",
-    "error",
     "failed",
 )
+DEFAULT_START_DELAY_MS = 0
 
 
 class VoiceInputState:
@@ -82,6 +83,10 @@ def send_input(action: str, mode: str, key: str, dry_run: bool) -> None:
         raise RuntimeError(f"input command failed: {detail}")
 
 
+def start_delay_seconds(delay_ms: int) -> float:
+    return max(0, delay_ms) / 1000.0
+
+
 def wait_for_dbus(name: str, child: subprocess.Popen[str], timeout: float = 15.0) -> None:
     deadline = time.monotonic() + timeout
     command = [
@@ -136,24 +141,58 @@ def run(args: argparse.Namespace) -> int:
     if args.input_mode == "direct" and shutil.which("vinput") is None:
         raise RuntimeError("vinput is not installed; use --input-mode keyboard or install vinput")
 
-    command = [binary, "-vv", "--name", args.name]
+    command = [binary, "-v", "--gain", str(args.gain), "--name", args.name]
     if args.device:
         command.extend(["-d", args.device])
     print(f"starting_atvvoice name={args.name}", flush=True)
     child = subprocess.Popen(
         command,
         stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
         bufsize=1,
     )
     monitor: subprocess.Popen[str] | None = None
     state = VoiceInputState()
-    try:
-        if child.stderr is not None:
-            import threading
+    input_started = False
+    start_timer: threading.Timer | None = None
 
+    def cancel_start() -> None:
+        nonlocal start_timer
+        if start_timer is not None:
+            start_timer.cancel()
+            start_timer = None
+
+    def start_input() -> None:
+        nonlocal input_started, start_timer
+        start_timer = None
+        if input_started:
+            return
+        send_input("start", args.input_mode, args.key, args.dry_run)
+        input_started = True
+
+    def stop_input() -> None:
+        nonlocal input_started
+        cancel_start()
+        if not input_started:
+            return
+        send_input("stop", args.input_mode, args.key, args.dry_run)
+        input_started = False
+
+    def schedule_start() -> None:
+        nonlocal start_timer
+        cancel_start()
+        delay = start_delay_seconds(args.start_delay_ms)
+        print(f"input_schedule action=start delay_ms={args.start_delay_ms}", flush=True)
+        start_timer = threading.Timer(delay, start_input)
+        start_timer.daemon = True
+        start_timer.start()
+
+    try:
+        if child.stdout is not None:
+            threading.Thread(target=forward_logs, args=(child.stdout,), daemon=True).start()
+        if child.stderr is not None:
             threading.Thread(target=forward_logs, args=(child.stderr,), daemon=True).start()
         wait_for_dbus(args.name, child)
         monitor = subprocess.Popen(
@@ -179,10 +218,12 @@ def run(args: argparse.Namespace) -> int:
                 continue
             print(f"mic_state={mic_state}", flush=True)
             for action in state.transition(mic_state):
-                send_input(action, args.input_mode, args.key, args.dry_run)
+                if action == "start":
+                    schedule_start()
+                else:
+                    stop_input()
     finally:
-        if state.pressed:
-            send_input("stop", args.input_mode, args.key, args.dry_run)
+        stop_input()
         terminate(monitor)
         terminate(child)
     return 0
@@ -194,10 +235,22 @@ def main() -> int:
     parser.add_argument("-d", "--device", help="ATVV device address; omit to auto-discover")
     parser.add_argument("--name", default="xiaomi-remote", help="ATVVoice instance name")
     parser.add_argument(
+        "--gain",
+        type=float,
+        default=0.0,
+        help="ATVVoice microphone gain in dB (default: 0 for Xiaomi remotes)",
+    )
+    parser.add_argument(
+        "--start-delay-ms",
+        type=int,
+        default=DEFAULT_START_DELAY_MS,
+        help="delay F9/vinput start after mic opening (default: 0)",
+    )
+    parser.add_argument(
         "--input-mode",
         choices=("direct", "keyboard"),
-        default="direct",
-        help="directly control vinput (default) or inject F9 through X11",
+        default="keyboard",
+        help="inject F9 through X11 (default) or directly control vinput",
     )
     parser.add_argument("--key", default="F9", help="key to hold while the mic streams")
     parser.add_argument("--dry-run", action="store_true", help="log key events without sending them")
