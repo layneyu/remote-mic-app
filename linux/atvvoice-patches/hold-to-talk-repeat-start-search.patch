@@ -1,0 +1,63 @@
+diff --git a/src/atvv.rs b/src/atvv.rs
+index 921a9e6..74af50a 100644
+--- a/src/atvv.rs
++++ b/src/atvv.rs
+@@ -7,7 +7,7 @@ use tokio::sync::mpsc;
+ use tokio::time::{self, Instant};
+ 
+ use crate::consumer;
+-use crate::protocol::types::{AudioFrame, AudioStopReason, CtlEvent, StreamId};
++use crate::protocol::types::{AudioFrame, AudioStartReason, AudioStopReason, CtlEvent, StreamId};
+ use crate::protocol::Protocol;
+ 
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+@@ -29,6 +29,10 @@ impl std::fmt::Display for State {
+     }
+ }
+ 
++fn should_ignore_repeated_start_search(state: State, hold_to_talk: bool) -> bool {
++    state == State::Opening || (state == State::Streaming && hold_to_talk)
++}
++
+ /// Commands that can be sent from external sources (D-Bus, CLI, etc.).
+ #[derive(Debug, Clone, Copy)]
+ #[non_exhaustive]
+@@ -159,6 +163,7 @@ pub async fn run_session(
+ 
+     // Track the current stream ID (set on AudioStart, used for MIC_CLOSE/keepalive).
+     let mut current_stream_id: Option<StreamId> = None;
++    let mut hold_to_talk = false;
+ 
+ 
+ 
+@@ -199,6 +204,7 @@ pub async fn run_session(
+                         // Remote resets its sequence counter on every AUDIO_START
+                         last_seq = None;
+                         current_stream_id = Some(stream_id);
++                        hold_to_talk = matches!(reason, AudioStartReason::HoldToTalk);
+                         set_state(State::Streaming, &mut state);
+                         // Reset keepalive timer when streaming starts/restarts
+                         if keepalive_enabled {
+@@ -208,7 +214,9 @@ pub async fn run_session(
+                         tracing::info!("START_SEARCH (state={:?})", state);
+ 
+-                        if state == State::Streaming || state == State::Opening {
++                        if should_ignore_repeated_start_search(state, hold_to_talk) {
++                            tracing::debug!("Ignoring repeated START_SEARCH during active voice session");
++                        } else if state == State::Streaming || state == State::Opening {
+                             // Toggle: second press stops streaming
+                             let sid = current_stream_id.unwrap_or(StreamId::MIC_OPEN);
+                             ble.write_command(&protocol.mic_close_cmd(sid)).await?;
+@@ -1444,4 +1452,12 @@ mod tests {
+         let result = session.await.unwrap();
+         assert!(result.is_ok());
+     }
++
++    #[test]
++    fn test_htt_ignores_repeated_start_search() {
++        assert!(should_ignore_repeated_start_search(State::Opening, false));
++        assert!(should_ignore_repeated_start_search(State::Streaming, true));
++        assert!(!should_ignore_repeated_start_search(State::Streaming, false));
++        assert!(!should_ignore_repeated_start_search(State::Connected, true));
++    }
+ }
