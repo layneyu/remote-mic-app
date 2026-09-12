@@ -6,12 +6,16 @@
 
 - 已完成：独立 Linux 目录、只读 ATVV 设备探测器、公开兼容边界；
 - 已增加：ATVV 语音会话到 vinput 的最小桥接，按下时从 `opening` 开始录音，释放或断连时停止；另保留 F9 键盘注入兼容模式，见 [`voice-f9-bridge/README.md`](voice-f9-bridge/README.md)；
-- 已增加：小米遥控器的 XInput2 按键桥接，方向键/确定键默认回注原生按键，菜单键作为 Super，电源键单击回注 `/`，TV+左右切换当前输出的 i3 workspace；实现见 [`remote-keymap/`](remote-keymap/)；
+- 已增加：小米遥控器的 evdev 按键桥接，按设备名扫描输入节点并独占读取；方向键/确定键默认回注原生按键，菜单键作为 Super，电源键单击回注 `/`，TV+左右切换当前输出的 i3 workspace；实现见 [`remote-keymap/`](remote-keymap/)；
+- 已增加：当前小米遥控器语音键按 Linux evdev 语义识别（兼容 F1–F24、标准语音命令/助手键），按下/释放直接回注 F9，复用本机已有 F9 语音输入路径，不增加手势等待；
 - 已增加：本地按键映射配置界面，运行 `python3 linux/remote-keymap/ui/server.py` 后访问 `http://127.0.0.1:8765/`，保存后自动导出运行时配置并重载按键服务，也可从应用菜单打开“小米遥控器按键映射”；
+- 已增加：`~/.config/xiaomi-remote/voice.json` 作为本机 F9 最短录音时长的统一入口；`voice-f9-bridge/sync_config.py` 在登录时及相关配置变化后把该值同步到 VoCoType 共享音频配置和 Fcitx 运行时/持久配置，并对修改前的配置做同目录备份；
 - 针对 HoldToTalk 遥控器增加 ATVVoice 补丁：忽略长按期间重复的 `START_SEARCH`，只用 `AUDIO_STOP(HttButtonRelease)` 结束会话；补丁说明见 [`atvvoice-patches/hold-to-talk-repeat-start-search.md`](atvvoice-patches/hold-to-talk-repeat-start-search.md)；
 - 待完成：将 ATVVoice 依赖纳入稳定安装/用户服务流程，并完成真实语音文字验收；
 - 不改变：遥控器方向键与确定键的原生 HID 行为；
-- 安全边界：桥接只独占名为 `小米蓝牙语音遥控器` 的 XInput 设备，不接管笔记本自身的 ACPI 电源键；
+- 不改变：F9 本地模型和右 Ctrl 阿里云在线模型的配置；本映射只负责将遥控器语音键转成 F9，不代表已恢复遥控器麦克风的 ATVVoice 音频链路；
+- 系统电源策略：笔记本电源键短按进入睡眠；该策略通过独立的 `systemd-logind` drop-in 配置，遥控器电源键仍由 evdev 桥接处理；
+- 安全边界：桥接只独占名为 `小米蓝牙语音遥控器` 的 evdev 输入节点，不接管笔记本自身的 ACPI 电源键；配套 udev 规则仅给该节点授予当前用户访问权限并移除其 `power-switch` 标签；
 - 兼容状态：候选，尚未完成当前小米遥控器的真实语音验收。
 
 ## 依赖

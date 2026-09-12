@@ -1,0 +1,10 @@
+[Unit]
+Description=Synchronize Xiaomi remote F9 voice settings
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/xiaomi-voice-config-sync --config %h/.config/xiaomi-remote/voice.json
+
+[Install]
+WantedBy=default.target

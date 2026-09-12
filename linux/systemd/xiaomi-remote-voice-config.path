@@ -1,0 +1,11 @@
+[Unit]
+Description=Watch Xiaomi remote F9 voice settings
+
+[Path]
+PathChanged=%h/.config/xiaomi-remote/voice.json
+PathChanged=%h/.config/vocotype/config.json
+PathChanged=%h/.config/fcitx5/conf/vocotype.conf
+Unit=xiaomi-remote-voice-config.service
+
+[Install]
+WantedBy=default.target
