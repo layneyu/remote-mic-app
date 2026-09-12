@@ -1,6 +1,8 @@
 #include "policy.h"
 
 #include <assert.h>
+#include <linux/input-event-codes.h>
+#include <X11/keysym.h>
 
 int main(void) {
     ButtonTracker tracker;
@@ -25,5 +27,15 @@ int main(void) {
     assert(power_action_for_trigger(BUTTON_TRIGGER_SINGLE) == POWER_ACTION_SLASH);
     assert(power_action_for_trigger(BUTTON_TRIGGER_DOUBLE) == POWER_ACTION_RIGHT_CTRL);
     assert(power_action_for_trigger(BUTTON_TRIGGER_LONG) == POWER_ACTION_NONE);
+    assert(remote_keysym_is_voice(XK_F3));
+    assert(remote_keysym_is_voice(XK_F5));
+    assert(remote_keysym_is_voice(0x10081246UL));
+    assert(remote_keysym_is_voice(0x10081247UL));
+    assert(!remote_keysym_is_voice(XK_Control_L));
+    assert(remote_evdev_key_is_voice(KEY_F3));
+    assert(remote_evdev_key_is_voice(KEY_F5));
+    assert(remote_evdev_key_is_voice(KEY_VOICECOMMAND));
+    assert(remote_evdev_key_is_voice(KEY_ASSISTANT));
+    assert(!remote_evdev_key_is_voice(KEY_POWER));
     return 0;
 }

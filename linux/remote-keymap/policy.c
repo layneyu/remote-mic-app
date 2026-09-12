@@ -1,5 +1,14 @@
 #include "policy.h"
 
+#include <linux/input-event-codes.h>
+#include <X11/keysym.h>
+
+/* XF86keysym.h undefines _EVDEVK at EOF, so keep these public X11 values local. */
+enum {
+    REMOTE_XKEYSYM_VOICE_COMMAND = 0x10081246,
+    REMOTE_XKEYSYM_ASSISTANT = 0x10081247,
+};
+
 void button_tracker_init(ButtonTracker *tracker) {
     *tracker = (ButtonTracker){0};
 }
@@ -52,6 +61,21 @@ ButtonTrigger button_tracker_flush(
 
 bool chord_window_active(uint64_t now_ms, uint64_t deadline_ms) {
     return now_ms < deadline_ms;
+}
+
+bool remote_keysym_is_voice(unsigned long keysym) {
+    return (keysym >= XK_F1 && keysym <= XK_F12) ||
+        keysym == REMOTE_XKEYSYM_VOICE_COMMAND ||
+        keysym == REMOTE_XKEYSYM_ASSISTANT;
+}
+
+bool remote_evdev_key_is_voice(unsigned int keycode) {
+    return (keycode >= KEY_F1 && keycode <= KEY_F10) ||
+        keycode == KEY_F11 ||
+        keycode == KEY_F12 ||
+        (keycode >= KEY_F13 && keycode <= KEY_F24) ||
+        keycode == KEY_VOICECOMMAND ||
+        keycode == KEY_ASSISTANT;
 }
 
 PowerAction power_action_for_trigger(ButtonTrigger trigger) {

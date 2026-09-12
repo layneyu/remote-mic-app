@@ -1,4 +1,6 @@
 xiaomi-keymapd
 test_policy
 test_runtime_config
+test_key_names
+test_device_wait
 __pycache__/

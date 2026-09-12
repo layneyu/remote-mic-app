@@ -40,6 +40,10 @@ ButtonTrigger button_tracker_flush(
 
 bool chord_window_active(uint64_t now_ms, uint64_t deadline_ms);
 
+bool remote_keysym_is_voice(unsigned long keysym);
+
+bool remote_evdev_key_is_voice(unsigned int keycode);
+
 PowerAction power_action_for_trigger(ButtonTrigger trigger);
 
 #endif

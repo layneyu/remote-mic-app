@@ -1,0 +1,17 @@
+[Unit]
+Description=Xiaomi Bluetooth voice remote keymap for i3
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/xiaomi-keymapd --config %h/.config/xiaomi-remote/keymapd.conf --device-name 小米蓝牙语音遥控器
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=%h/.Xauthority
+# The daemon waits for evdev nodes and reconnects internally. Restart only
+# after an unexpected process failure.
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=default.target

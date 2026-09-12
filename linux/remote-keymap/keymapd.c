@@ -2,15 +2,20 @@
 
 #include "policy.h"
 #include "runtime_config.h"
+#include "key_names.h"
+#include "device_wait.h"
 
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
-#include <X11/extensions/XInput2.h>
-#include <X11/extensions/record.h>
+#include <X11/XF86keysym.h>
 #include <X11/extensions/XTest.h>
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <linux/input-event-codes.h>
+#include <linux/input.h>
+#include <limits.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -19,23 +24,23 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <sys/ioctl.h>
 #include <time.h>
 #include <unistd.h>
 
 enum {
-    KEYCODE_TV = 49,
-    KEYCODE_OK = 36,
-    KEYCODE_UP = 111,
-    KEYCODE_DOWN = 116,
-    KEYCODE_LEFT = 113,
-    KEYCODE_RIGHT = 114,
-    KEYCODE_HOME = 110,
-    KEYCODE_MENU = 135,
-    KEYCODE_BACK = 166,
-    KEYCODE_VOLUME_DOWN = 122,
-    KEYCODE_VOLUME_UP = 123,
-    KEYCODE_POWER = 124,
-    KEYCODE_VOICE = 69,
+    KEYCODE_TV = KEY_GRAVE,
+    KEYCODE_OK = KEY_ENTER,
+    KEYCODE_UP = KEY_UP,
+    KEYCODE_DOWN = KEY_DOWN,
+    KEYCODE_LEFT = KEY_LEFT,
+    KEYCODE_RIGHT = KEY_RIGHT,
+    KEYCODE_HOME = KEY_HOME,
+    KEYCODE_MENU = KEY_COMPOSE,
+    KEYCODE_BACK = KEY_BACK,
+    KEYCODE_VOLUME_DOWN = KEY_VOLUMEDOWN,
+    KEYCODE_VOLUME_UP = KEY_VOLUMEUP,
+    KEYCODE_POWER = KEY_POWER,
     TV_CHORD_WINDOW_MS = 400,
     MENU_CHORD_WINDOW_MS = 700,
 };
@@ -77,50 +82,88 @@ typedef struct {
     KeyCode super;
     KeyCode slash;
     KeyCode right_ctrl;
+    KeyCode f9;
 } OutputKeycodes;
 
 static void run_workspace_command(const char *direction, bool dry_run);
 static void run_chatgpt(bool dry_run);
 
 static KeyCode keycode_for_name(Display *display, const char *name) {
-    if (strcmp(name, "Ctrl") == 0 || strcmp(name, "Control") == 0 || strcmp(name, "Control_R") == 0) {
-        return XKeysymToKeycode(display, XK_Control_R);
-    }
-    if (strcmp(name, "Alt") == 0 || strcmp(name, "Alt_L") == 0) {
-        return XKeysymToKeycode(display, XK_Alt_L);
-    }
-    if (strcmp(name, "Shift") == 0 || strcmp(name, "Shift_L") == 0) {
-        return XKeysymToKeycode(display, XK_Shift_L);
-    }
-    if (strcmp(name, "Super") == 0 || strcmp(name, "Super_L") == 0) {
-        return XKeysymToKeycode(display, XStringToKeysym("Super_L"));
-    }
-    if (strcmp(name, "/") == 0 || strcmp(name, "slash") == 0) {
-        return XKeysymToKeycode(display, XK_slash);
-    }
-    if (strcmp(name, "Enter") == 0 || strcmp(name, "Return") == 0) {
-        return XKeysymToKeycode(display, XK_Return);
-    }
-    if (strcmp(name, "Esc") == 0 || strcmp(name, "Escape") == 0) {
-        return XKeysymToKeycode(display, XK_Escape);
-    }
-    if (strcmp(name, "Left") == 0) {
-        return XKeysymToKeycode(display, XK_Left);
-    }
-    if (strcmp(name, "Right") == 0) {
-        return XKeysymToKeycode(display, XK_Right);
-    }
-    if (strcmp(name, "Up") == 0) {
-        return XKeysymToKeycode(display, XK_Up);
-    }
-    if (strcmp(name, "Down") == 0) {
-        return XKeysymToKeycode(display, XK_Down);
-    }
-    KeySym keysym = XStringToKeysym(name);
-    if (keysym == NoSymbol && strlen(name) == 1) {
-        keysym = XStringToKeysym(name);
-    }
+    KeySym keysym = key_sym_for_name(name);
     return keysym == NoSymbol ? 0 : XKeysymToKeycode(display, keysym);
+}
+
+static int open_remote_evdev(const char *wanted_name) {
+    DIR *directory = opendir("/sys/class/input");
+    if (directory == NULL) {
+        fprintf(stderr, "keymap error: cannot scan Linux input devices\n");
+        return -1;
+    }
+
+    struct dirent *entry;
+    while ((entry = readdir(directory)) != NULL) {
+        if (strncmp(entry->d_name, "event", 5) != 0 || entry->d_name[5] == '\0') {
+            continue;
+        }
+        bool numeric = true;
+        for (const char *cursor = entry->d_name + 5; *cursor != '\0'; cursor++) {
+            if (*cursor < '0' || *cursor > '9') {
+                numeric = false;
+                break;
+            }
+        }
+        if (!numeric) {
+            continue;
+        }
+
+        char name_path[PATH_MAX];
+        snprintf(name_path, sizeof(name_path), "/sys/class/input/%s/device/name", entry->d_name);
+        FILE *name_file = fopen(name_path, "r");
+        if (name_file == NULL) {
+            continue;
+        }
+        char device_name[256];
+        bool matches = fgets(device_name, sizeof(device_name), name_file) != NULL;
+        fclose(name_file);
+        if (!matches) {
+            continue;
+        }
+        device_name[strcspn(device_name, "\r\n")] = '\0';
+        if (strcmp(device_name, wanted_name) != 0) {
+            continue;
+        }
+
+        char device_path[PATH_MAX];
+        snprintf(device_path, sizeof(device_path), "/dev/input/%s", entry->d_name);
+        int descriptor = open(device_path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+        if (descriptor < 0) {
+            fprintf(stderr, "keymap error: cannot open matching remote input device\n");
+            continue;
+        }
+        if (ioctl(descriptor, EVIOCGRAB, 1) < 0) {
+            fprintf(stderr, "keymap error: cannot exclusively grab remote input device\n");
+            close(descriptor);
+            continue;
+        }
+        closedir(directory);
+        return descriptor;
+    }
+    closedir(directory);
+    return -1;
+}
+
+static int open_remote_for_wait(void *context) {
+    return open_remote_evdev((const char *)context);
+}
+
+static bool remote_wait_stopped(void *context) {
+    (void)context;
+    return stop_requested != 0;
+}
+
+static void wait_for_remote_retry(unsigned int delay_ms, void *context) {
+    (void)context;
+    poll(NULL, 0, (int)delay_ms);
 }
 
 static bool emit_custom_key_action(Display *display, const char *action, bool dry_run) {
@@ -265,20 +308,44 @@ static const char *device_name_or_default(const char *value) {
     return value == NULL ? "小米蓝牙语音遥控器" : value;
 }
 
-static int find_device(Display *display, const char *wanted_name) {
-    int count = 0;
-    XIDeviceInfo *devices = XIQueryDevice(display, XIAllDevices, &count);
-    int device_id = -1;
-    for (int index = 0; devices != NULL && index < count; index++) {
-        if (devices[index].name != NULL && strcmp(devices[index].name, wanted_name) == 0) {
-            device_id = devices[index].deviceid;
+static KeyCode native_keycode_for_remote_key(Display *display, unsigned int code) {
+    KeySym keysym = NoSymbol;
+    switch (code) {
+        case KEY_GRAVE:
+            keysym = XK_grave;
             break;
-        }
+        case KEY_ENTER:
+        case KEY_OK:
+            keysym = XK_Return;
+            break;
+        case KEY_UP:
+            keysym = XK_Up;
+            break;
+        case KEY_DOWN:
+            keysym = XK_Down;
+            break;
+        case KEY_LEFT:
+            keysym = XK_Left;
+            break;
+        case KEY_RIGHT:
+            keysym = XK_Right;
+            break;
+        case KEY_HOME:
+            keysym = XK_Home;
+            break;
+        case KEY_BACK:
+            keysym = XF86XK_Back;
+            break;
+        case KEY_VOLUMEUP:
+            keysym = XF86XK_AudioRaiseVolume;
+            break;
+        case KEY_VOLUMEDOWN:
+            keysym = XF86XK_AudioLowerVolume;
+            break;
+        default:
+            break;
     }
-    if (devices != NULL) {
-        XIFreeDeviceInfo(devices);
-    }
-    return device_id;
+    return keysym == NoSymbol ? 0 : XKeysymToKeycode(display, keysym);
 }
 
 static int tracker_timeout_ms(const ButtonTracker *tracker, uint64_t now_ms) {
@@ -330,10 +397,10 @@ static void flush_power(
     }
 }
 
-static void handle_key_event(
+static void handle_evdev_key_event(
     Display *display,
-    const XIDeviceEvent *event,
-    bool *pressed,
+    const struct input_event *event,
+    bool pressed[KEY_MAX + 1],
     bool *menu_held,
     bool *menu_chord_pending,
     uint64_t *menu_chord_deadline_ms,
@@ -347,11 +414,17 @@ static void handle_key_event(
     bool *consume_direction_release,
     bool dry_run
 ) {
-    unsigned int code = event->detail;
-    if (code >= 256) {
+    if (event->type != EV_KEY || event->code > KEY_MAX) {
         return;
     }
-    bool is_press = event->evtype == XI_KeyPress;
+    unsigned int code = event->code;
+    if (event->value == 2) {
+        return;
+    }
+    if (event->value != 0 && event->value != 1) {
+        return;
+    }
+    bool is_press = event->value == 1;
     if (is_press && pressed[code]) {
         return;
     }
@@ -363,8 +436,11 @@ static void handle_key_event(
         pressed[code] = false;
     }
 
-    if (code == KEYCODE_VOICE) {
-        printf("remote key=voice action=consume\n");
+    if (remote_evdev_key_is_voice(code)) {
+        printf("remote key=voice evdev_semantic=true edge=%s\n",
+               is_press ? "down" : "up");
+        fflush(stdout);
+        fake_key(display, keys->f9, is_press, dry_run);
         return;
     }
     if (code == KEYCODE_MENU) {
@@ -432,7 +508,7 @@ static void handle_key_event(
         } else if (!is_press && *consume_direction_release) {
             *consume_direction_release = false;
         } else {
-            fake_key(display, (KeyCode)code, is_press, dry_run);
+            fake_key(display, native_keycode_for_remote_key(display, code), is_press, dry_run);
         }
         if (!is_press && *menu_chord_pending) {
             fake_key(display, keys->super, false, dry_run);
@@ -450,7 +526,7 @@ static void handle_key_event(
             if (trigger != BUTTON_TRIGGER_NONE) {
                 emit_button_action(
                     display, config, KEYMAP_BUTTON_BACK, "back", trigger,
-                    keys, dry_run, (KeyCode)KEYCODE_BACK
+                    keys, dry_run, native_keycode_for_remote_key(display, KEYCODE_BACK)
                 );
             }
         }
@@ -459,11 +535,11 @@ static void handle_key_event(
     if (code == KEYCODE_OK || code == KEYCODE_UP || code == KEYCODE_DOWN ||
         code == KEYCODE_VOLUME_UP ||
         code == KEYCODE_VOLUME_DOWN) {
-        fake_key(display, (KeyCode)code, is_press, dry_run);
+        fake_key(display, native_keycode_for_remote_key(display, code), is_press, dry_run);
         return;
     }
-    printf("remote key=unknown keycode=%u action=passthrough\n", code);
-    fake_key(display, (KeyCode)code, is_press, dry_run);
+    printf("remote key=unknown evdev_code=%u action=passthrough\n", code);
+    fake_key(display, native_keycode_for_remote_key(display, code), is_press, dry_run);
 }
 
 static void usage(const char *program) {
@@ -500,59 +576,12 @@ int main(int argc, char **argv) {
         fprintf(stderr, "keymap error: cannot open X display\n");
         return 1;
     }
-    int xi_opcode = 0;
-    int xi_event = 0;
-    int xi_error = 0;
-    if (!XQueryExtension(display, "XInputExtension", &xi_opcode, &xi_event, &xi_error)) {
-        fprintf(stderr, "keymap error: XInput extension is unavailable\n");
-        XCloseDisplay(display);
-        return 1;
-    }
-    int major = 2;
-    int minor = 0;
-    if (XIQueryVersion(display, &major, &minor) != Success) {
-        fprintf(stderr, "keymap error: XInput2 is unavailable\n");
-        XCloseDisplay(display);
-        return 1;
-    }
-    int device_id = find_device(display, wanted_name);
-    if (device_id < 0) {
-        fprintf(stderr, "keymap error: device not found: %s\n", wanted_name);
-        XCloseDisplay(display);
-        return 1;
-    }
-
-    unsigned char mask[(XI_LASTEVENT + 7) / 8];
-    memset(mask, 0, sizeof(mask));
-    XISetMask(mask, XI_KeyPress);
-    XISetMask(mask, XI_KeyRelease);
-    XIEventMask event_mask = {
-        .deviceid = device_id,
-        .mask_len = sizeof(mask),
-        .mask = mask,
-    };
-    if (XIGrabDevice(
-            display,
-            device_id,
-            DefaultRootWindow(display),
-            CurrentTime,
-            None,
-            GrabModeAsync,
-            GrabModeAsync,
-            False,
-            &event_mask
-        ) != GrabSuccess) {
-        fprintf(stderr, "keymap error: cannot grab device: %s\n", wanted_name);
-        XCloseDisplay(display);
-        return 1;
-    }
-
     KeyCode super_keycode = XKeysymToKeycode(display, XStringToKeysym("Super_L"));
     KeyCode slash_keycode = XKeysymToKeycode(display, XK_slash);
     KeyCode right_ctrl_keycode = XKeysymToKeycode(display, XK_Control_R);
-    if (super_keycode == 0 || slash_keycode == 0 || right_ctrl_keycode == 0) {
+    KeyCode f9_keycode = XKeysymToKeycode(display, XK_F9);
+    if (super_keycode == 0 || slash_keycode == 0 || right_ctrl_keycode == 0 || f9_keycode == 0) {
         fprintf(stderr, "keymap error: required X key symbols are unavailable\n");
-        XIUngrabDevice(display, device_id, CurrentTime);
         XCloseDisplay(display);
         return 1;
     }
@@ -560,55 +589,75 @@ int main(int argc, char **argv) {
         .super = super_keycode,
         .slash = slash_keycode,
         .right_ctrl = right_ctrl_keycode,
+        .f9 = f9_keycode,
     };
 
     signal(SIGINT, request_stop);
     signal(SIGTERM, request_stop);
-    printf("keymap_ready device=%s device_id=%d dry_run=%s\n", wanted_name, device_id, dry_run ? "true" : "false");
-    fflush(stdout);
-
-    bool pressed[256] = {false};
-    bool menu_held = false;
-    bool menu_chord_pending = false;
-    uint64_t menu_chord_deadline_ms = 0;
-    bool tv_held = false;
-    bool tv_chord_pending = false;
-    uint64_t tv_chord_deadline_ms = 0;
-    bool consume_direction_release = false;
-    ButtonTracker power_tracker;
-    ButtonTracker back_tracker;
-    button_tracker_init(&power_tracker);
-    button_tracker_init(&back_tracker);
-    int connection_fd = ConnectionNumber(display);
     while (!stop_requested) {
-        flush_power(display, &config, &power_tracker, &output_keys, dry_run);
-        ButtonTrigger back_trigger = button_tracker_flush(&back_tracker, monotonic_ms(), 280);
-        if (back_trigger != BUTTON_TRIGGER_NONE) {
-            emit_button_action(
-                display, &config, KEYMAP_BUTTON_BACK, "back", back_trigger,
-                &output_keys, dry_run, (KeyCode)KEYCODE_BACK
-            );
+        printf("keymap_waiting device=%s\n", wanted_name);
+        fflush(stdout);
+        int input_descriptor = wait_for_device(
+            open_remote_for_wait, remote_wait_stopped, wait_for_remote_retry, (void *)wanted_name
+        );
+        if (input_descriptor < 0) {
+            break;
         }
-        if (menu_chord_pending && !chord_window_active(monotonic_ms(), menu_chord_deadline_ms)) {
-            fake_key(display, output_keys.super, false, dry_run);
-            menu_chord_pending = false;
-        }
-        while (!stop_requested && XPending(display) > 0) {
-            XEvent event;
-            XNextEvent(display, &event);
-            if (event.type != GenericEvent || event.xcookie.extension != xi_opcode) {
+        printf("keymap_ready device=%s source=evdev exclusive=true dry_run=%s\n",
+               wanted_name, dry_run ? "true" : "false");
+        fflush(stdout);
+
+        bool pressed[KEY_MAX + 1] = {false};
+        bool menu_held = false;
+        bool menu_chord_pending = false;
+        uint64_t menu_chord_deadline_ms = 0;
+        bool tv_held = false;
+        bool tv_chord_pending = false;
+        uint64_t tv_chord_deadline_ms = 0;
+        bool consume_direction_release = false;
+        ButtonTracker power_tracker;
+        ButtonTracker back_tracker;
+        button_tracker_init(&power_tracker);
+        button_tracker_init(&back_tracker);
+
+        while (!stop_requested) {
+            flush_power(display, &config, &power_tracker, &output_keys, dry_run);
+            ButtonTrigger back_trigger = button_tracker_flush(&back_tracker, monotonic_ms(), 280);
+            if (back_trigger != BUTTON_TRIGGER_NONE) {
+                emit_button_action(
+                    display, &config, KEYMAP_BUTTON_BACK, "back", back_trigger,
+                    &output_keys, dry_run, (KeyCode)KEYCODE_BACK
+                );
+            }
+            if (menu_chord_pending && !chord_window_active(monotonic_ms(), menu_chord_deadline_ms)) {
+                fake_key(display, output_keys.super, false, dry_run);
+                menu_chord_pending = false;
+            }
+            struct pollfd descriptor = {.fd = input_descriptor, .events = POLLIN};
+            uint64_t now_ms = monotonic_ms();
+            int timeout_ms = poll_timeout_ms(&power_tracker, &back_tracker, now_ms);
+            int menu_timeout_ms = menu_poll_timeout_ms(menu_chord_pending, menu_chord_deadline_ms, now_ms);
+            if (menu_timeout_ms < timeout_ms) {
+                timeout_ms = menu_timeout_ms;
+            }
+            int result = poll(&descriptor, 1, timeout_ms);
+            if (result < 0 && errno != EINTR) {
+                perror("keymap poll");
+                break;
+            }
+            if (result == 0 || stop_requested) {
                 continue;
             }
-            if (!XGetEventData(display, &event.xcookie)) {
-                continue;
+            if ((descriptor.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0) {
+                break;
             }
-            if ((event.xcookie.evtype == XI_KeyPress || event.xcookie.evtype == XI_KeyRelease) &&
-                event.xcookie.data != NULL) {
-                XIDeviceEvent *device_event = event.xcookie.data;
-                if (device_event->deviceid == device_id) {
-                    handle_key_event(
+            if ((descriptor.revents & POLLIN) != 0) {
+                struct input_event event;
+                ssize_t bytes = read(input_descriptor, &event, sizeof(event));
+                if (bytes == (ssize_t)sizeof(event)) {
+                    handle_evdev_key_event(
                         display,
-                        device_event,
+                        &event,
                         pressed,
                         &menu_held,
                         &menu_chord_pending,
@@ -623,31 +672,26 @@ int main(int argc, char **argv) {
                         &consume_direction_release,
                         dry_run
                     );
+                } else if (bytes < 0 && errno != EAGAIN && errno != EINTR) {
+                    perror("keymap read");
+                    break;
+                } else if (bytes != (ssize_t)sizeof(event) && bytes >= 0) {
+                    fprintf(stderr, "keymap error: incomplete remote input event\n");
+                    break;
                 }
             }
-            XFreeEventData(display, &event.xcookie);
         }
-        if (stop_requested) {
-            break;
+
+        if (menu_held || menu_chord_pending) {
+            fake_key(display, output_keys.super, false, dry_run);
         }
-        struct pollfd descriptor = {.fd = connection_fd, .events = POLLIN};
-        uint64_t now_ms = monotonic_ms();
-        int timeout_ms = poll_timeout_ms(&power_tracker, &back_tracker, now_ms);
-        int menu_timeout_ms = menu_poll_timeout_ms(menu_chord_pending, menu_chord_deadline_ms, now_ms);
-        if (menu_timeout_ms < timeout_ms) {
-            timeout_ms = menu_timeout_ms;
-        }
-        int result = poll(&descriptor, 1, timeout_ms);
-        if (result < 0 && errno != EINTR) {
-            perror("keymap poll");
-            break;
+        ioctl(input_descriptor, EVIOCGRAB, 0);
+        close(input_descriptor);
+        if (!stop_requested) {
+            fprintf(stderr, "keymap notice: remote input device disconnected; waiting for reconnect\n");
         }
     }
 
-    if (menu_held || menu_chord_pending) {
-        fake_key(display, output_keys.super, false, dry_run);
-    }
-    XIUngrabDevice(display, device_id, CurrentTime);
     XFlush(display);
     XCloseDisplay(display);
     return 0;

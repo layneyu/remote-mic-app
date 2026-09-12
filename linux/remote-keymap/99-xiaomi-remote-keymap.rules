@@ -1,0 +1,3 @@
+# Grant the active desktop user access to this remote's evdev node only.
+# The keymap daemon uses EVIOCGRAB so systemd-logind cannot consume its power key.
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="小米蓝牙语音遥控器", ENV{ID_SEAT}="seat0", OWNER="layne", MODE="0600", TAG-="power-switch", TAG+="uaccess"
