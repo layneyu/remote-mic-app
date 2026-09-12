@@ -29,6 +29,7 @@ int main(void) {
     assert(strcmp(keymap_config_action(&config, KEYMAP_BUTTON_BACK, BUTTON_TRIGGER_DOUBLE), "key:Shift+Tab") == 0);
     assert(strcmp(keymap_config_action(&config, KEYMAP_BUTTON_HOME, BUTTON_TRIGGER_SINGLE), "none") == 0);
     assert(strcmp(keymap_config_action(&config, KEYMAP_BUTTON_MENU, BUTTON_TRIGGER_SINGLE), "super") == 0);
+    assert(strcmp(keymap_config_action(&config, KEYMAP_BUTTON_TV, BUTTON_TRIGGER_SINGLE), "workspace-layer") == 0);
 
     unlink(path);
     return 0;

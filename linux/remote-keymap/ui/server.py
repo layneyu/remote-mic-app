@@ -19,7 +19,7 @@ RUNTIME_CONFIG_PATH = CONFIG_PATH.with_name("keymapd.conf")
 ALLOWED_ACTIONS = {
     "none", "native", "super", "chatgpt", "slash", "workspace-prev",
     "workspace-next", "voice", "disable",
-    "right-ctrl",
+    "right-ctrl", "workspace-layer",
 }
 CUSTOM_KEY_ACTION = re.compile(r"^key:[A-Za-z0-9+_ -]{1,120}$")
 BUTTON_IDS = {
@@ -43,7 +43,7 @@ DEFAULT_CONFIG = {
         {"id": "down", "label": "下键", "icon": "⌄", "slots": {"single": "native", "double": "none", "long": "none"}},
         {"id": "volume_up", "label": "音量 +", "icon": "⊕", "note": "暂保持原生", "slots": {"single": "native", "double": "none", "long": "none"}},
         {"id": "volume_down", "label": "音量 −", "icon": "⊖", "note": "暂保持原生", "slots": {"single": "native", "double": "none", "long": "none"}},
-        {"id": "tv", "label": "TV 键", "icon": "TV", "note": "TV + 左右切 workspace", "slots": {"single": "none", "double": "none", "long": "none"}},
+        {"id": "tv", "label": "TV 键", "icon": "TV", "note": "TV 后 700ms 内按左右切 workspace", "slots": {"single": "workspace-layer", "double": "none", "long": "none"}},
     ],
 }
 
@@ -82,7 +82,11 @@ def read_config(path: Path = CONFIG_PATH) -> dict:
     if not path.exists():
         return json.loads(json.dumps(DEFAULT_CONFIG, ensure_ascii=False))
     try:
-        return validate_config(json.loads(path.read_text(encoding="utf-8")))
+        value = json.loads(path.read_text(encoding="utf-8"))
+        for button in value.get("buttons", []):
+            if button.get("id") == "tv" and button.get("slots", {}).get("single") == "none":
+                button["slots"]["single"] = "workspace-layer"
+        return validate_config(value)
     except (OSError, ValueError, json.JSONDecodeError):
         return json.loads(json.dumps(DEFAULT_CONFIG, ensure_ascii=False))
 

@@ -41,7 +41,7 @@ void keymap_config_defaults(KeymapConfig *config) {
     copy_action(config->buttons[KEYMAP_BUTTON_HOME].single, "chatgpt");
     copy_action(config->buttons[KEYMAP_BUTTON_MENU].single, "super");
     copy_action(config->buttons[KEYMAP_BUTTON_VOICE].single, "voice");
-    copy_action(config->buttons[KEYMAP_BUTTON_TV].single, "none");
+    copy_action(config->buttons[KEYMAP_BUTTON_TV].single, "workspace-layer");
     snprintf(config->device_name, KEYMAP_DEVICE_NAME_MAX, "%s", "小米蓝牙语音遥控器");
 }
 

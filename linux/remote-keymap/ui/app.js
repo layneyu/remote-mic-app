@@ -6,6 +6,7 @@ const ACTIONS = [
   ["slash", "/"],
   ["workspace-prev", "上一个 workspace"],
   ["workspace-next", "下一个 workspace"],
+  ["workspace-layer", "工作区切换（配合左右）"],
   ["voice", "语音输入（F9）"],
   ["right-ctrl", "右 Ctrl"],
   ["disable", "禁用按键"],
@@ -29,7 +30,7 @@ const FALLBACK = {
     { id: "down", label: "下键", icon: "⌄", slots: { single: "native", double: "none", long: "none" } },
     { id: "volume_up", label: "音量 +", icon: "⊕", note: "暂保持原生", slots: { single: "native", double: "none", long: "none" } },
     { id: "volume_down", label: "音量 −", icon: "⊖", note: "暂保持原生", slots: { single: "native", double: "none", long: "none" } },
-    { id: "tv", label: "TV 键", icon: "TV", note: "TV + 左右切 workspace", slots: { single: "none", double: "none", long: "none" } },
+    { id: "tv", label: "TV 键", icon: "TV", note: "TV 后 700ms 内按左右切 workspace", slots: { single: "workspace-layer", double: "none", long: "none" } },
   ],
 };
 
@@ -80,7 +81,7 @@ function renderCard(button) {
 
 function keyName(event) {
   const names = {
-    ControlLeft: "Ctrl", ControlRight: "Ctrl", AltLeft: "Alt", AltRight: "Alt",
+    ControlLeft: "Ctrl", ControlRight: "Right Ctrl", AltLeft: "Alt", AltRight: "Alt",
     ShiftLeft: "Shift", ShiftRight: "Shift", MetaLeft: "Super", MetaRight: "Super",
     ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right",
     Escape: "Esc", Backspace: "Backspace", Enter: "Enter", Tab: "Tab", Space: "Space",
