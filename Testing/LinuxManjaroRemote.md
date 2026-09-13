@@ -97,3 +97,14 @@ cargo run --manifest-path linux/atvv-probe/Cargo.toml -- --address AA:BB:CC:DD:E
 预期：TV 单击槽显示“工作区切换（配合左右）”，两份配置均保存 `workspace-layer`；左右方向分别切换当前聚焦输出的上一个/下一个 workspace。
 
 失败判定：页面仍显示“未设置”、保存后回退为 `none`，或页面声明与实际 workspace 行为不一致。
+
+## 用例 LNX-07：命令序列循环动作
+
+1. 将 `linux/remote-keymap/command-sequence.example.conf` 复制为 `~/.config/xiaomi-remote/command-sequence.conf`，写入 3 条无副作用测试命令，例如 `notify-send 'remote-sequence-1'`、`notify-send 'remote-sequence-2'`、`notify-send 'remote-sequence-3'`。
+2. 打开一个支持 `Ctrl+Shift+V` 粘贴的终端并聚焦它；在按键映射页面把音量 + 的单击动作设为“命令序列（按顺序执行）”，把音量 − 的单击动作设为 `Backspace`，保存。
+3. 连续完整按音量 + 4 次，再按音量 − 一次。
+4. 增删一行命令后再次按键。
+
+预期：音量 + 前 3 次分别将第 1、2、3 条命令粘贴到聚焦终端并回车，第 4 次重新执行第 1 条；文件发生变化后下一次从新文件的第 1 条开始。音量 − 每次按下产生一次 Backspace。日志只显示命令序号、数量和终端粘贴结果，不显示命令正文；焦点不是终端时记录 `focused_window_not_terminal` 并不注入。
+
+失败判定：音量 − 仍改变系统音量、音量 + 不粘贴或不回车、重复执行同一条、越过末尾不回绕、编辑文件后不重新读取、非终端焦点仍发生注入，或一次按住产生多次序列动作。命令是否真正完成需结合终端输出和命令自身可观察结果判断。

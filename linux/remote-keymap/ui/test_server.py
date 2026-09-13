@@ -68,6 +68,23 @@ class ConfigTests(unittest.TestCase):
         value["buttons"][0]["slots"]["single"] = "key:Esc"
         self.assertEqual(server.validate_config(value)["buttons"][0]["slots"]["single"], "key:Esc")
 
+    def test_workspace_layer_is_available_as_a_quick_preset(self):
+        page = (Path(server.ROOT) / "index.html").read_text(encoding="utf-8")
+        self.assertIn('data-preset="workspace-layer"', page)
+        self.assertIn("工作区切换（配合左右）", page)
+
+    def test_command_sequence_is_an_available_action(self):
+        self.assertIn("command-sequence", server.ALLOWED_ACTIONS)
+        page = (Path(server.ROOT) / "index.html").read_text(encoding="utf-8")
+        self.assertIn('data-preset="command-sequence"', page)
+        self.assertIn("命令序列（按顺序执行）", page)
+
+    def test_validate_config_accepts_command_sequence_action(self):
+        value = json.loads(json.dumps(server.DEFAULT_CONFIG, ensure_ascii=False))
+        value["buttons"][0]["slots"]["long"] = "command-sequence"
+        validated = server.validate_config(value)
+        self.assertEqual(validated["buttons"][0]["slots"]["long"], "command-sequence")
+
 
 if __name__ == "__main__":
     unittest.main()

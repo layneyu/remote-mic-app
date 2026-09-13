@@ -10,5 +10,7 @@ int main(void) {
     assert(key_sym_for_name("Right Ctrl") == XK_Control_R);
     assert(key_sym_for_name("Control_R") == XK_Control_R);
     assert(key_sym_for_name("Ctrl_R") == XK_Control_R);
+    assert(key_sym_for_name("Backspace") == XK_BackSpace);
+    assert(key_sym_for_name("BackSpace") == XK_BackSpace);
     return 0;
 }

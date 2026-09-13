@@ -7,6 +7,7 @@ const ACTIONS = [
   ["workspace-prev", "上一个 workspace"],
   ["workspace-next", "下一个 workspace"],
   ["workspace-layer", "工作区切换（配合左右）"],
+  ["command-sequence", "命令序列（按顺序执行）"],
   ["voice", "语音输入（F9）"],
   ["right-ctrl", "右 Ctrl"],
   ["disable", "禁用按键"],

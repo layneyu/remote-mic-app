@@ -3,4 +3,6 @@ test_policy
 test_runtime_config
 test_key_names
 test_device_wait
+test_command_sequence
+test_terminal_paste
 __pycache__/

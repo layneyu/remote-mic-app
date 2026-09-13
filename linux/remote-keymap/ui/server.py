@@ -19,7 +19,7 @@ RUNTIME_CONFIG_PATH = CONFIG_PATH.with_name("keymapd.conf")
 ALLOWED_ACTIONS = {
     "none", "native", "super", "chatgpt", "slash", "workspace-prev",
     "workspace-next", "voice", "disable",
-    "right-ctrl", "workspace-layer",
+    "right-ctrl", "workspace-layer", "command-sequence",
 }
 CUSTOM_KEY_ACTION = re.compile(r"^key:[A-Za-z0-9+_ -]{1,120}$")
 BUTTON_IDS = {

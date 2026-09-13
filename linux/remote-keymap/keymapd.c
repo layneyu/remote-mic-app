@@ -4,6 +4,8 @@
 #include "runtime_config.h"
 #include "key_names.h"
 #include "device_wait.h"
+#include "command_sequence.h"
+#include "terminal_paste.h"
 
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
@@ -87,6 +89,7 @@ typedef struct {
 
 static void run_workspace_command(const char *direction, bool dry_run);
 static void run_chatgpt(bool dry_run);
+static void run_command_sequence(Display *display, CommandSequenceState *sequence, bool dry_run);
 
 static KeyCode keycode_for_name(Display *display, const char *name) {
     KeySym keysym = key_sym_for_name(name);
@@ -197,7 +200,13 @@ static bool emit_custom_key_action(Display *display, const char *action, bool dr
     return true;
 }
 
-static void emit_action(Display *display, const char *action, const OutputKeycodes *keys, bool dry_run) {
+static void emit_action(
+    Display *display,
+    const char *action,
+    const OutputKeycodes *keys,
+    CommandSequenceState *sequence,
+    bool dry_run
+) {
     if (action == NULL || strcmp(action, "none") == 0 || strcmp(action, "native") == 0 ||
         strcmp(action, "voice") == 0 || strcmp(action, "disable") == 0) {
         return;
@@ -226,6 +235,10 @@ static void emit_action(Display *display, const char *action, const OutputKeycod
         fake_tap(display, keys->super, dry_run);
         return;
     }
+    if (strcmp(action, "command-sequence") == 0) {
+        run_command_sequence(display, sequence, dry_run);
+        return;
+    }
     (void)emit_custom_key_action(display, action, dry_run);
 }
 
@@ -249,6 +262,7 @@ static void emit_button_action(
     const char *button_name,
     ButtonTrigger trigger,
     const OutputKeycodes *keys,
+    CommandSequenceState *sequence,
     bool dry_run,
     KeyCode native_keycode
 ) {
@@ -262,7 +276,7 @@ static void emit_button_action(
     if (strcmp(action, "native") == 0 && native_keycode != 0) {
         fake_tap(display, native_keycode, dry_run);
     } else {
-        emit_action(display, action, keys, dry_run);
+        emit_action(display, action, keys, sequence, dry_run);
     }
 }
 
@@ -302,6 +316,20 @@ static void run_chatgpt(bool dry_run) {
               "xiaomi-focus-chatgpt", (char *)NULL);
         _exit(127);
     }
+}
+
+static void run_command_sequence(Display *display, CommandSequenceState *sequence, bool dry_run) {
+    char command[COMMAND_SEQUENCE_COMMAND_MAX];
+    size_t index = 0;
+    size_t count = 0;
+    if (!command_sequence_next(sequence->path, sequence, command, &index, &count)) {
+        printf("command_sequence phase=ignored result=empty\n");
+        fflush(stdout);
+        return;
+    }
+    printf("command_sequence phase=submitted index=%zu count=%zu\n", index + 1, count);
+    fflush(stdout);
+    (void)terminal_paste_command(display, command, dry_run);
 }
 
 static const char *device_name_or_default(const char *value) {
@@ -386,13 +414,14 @@ static void flush_power(
     const KeymapConfig *config,
     ButtonTracker *power_tracker,
     const OutputKeycodes *keys,
+    CommandSequenceState *sequence,
     bool dry_run
 ) {
     ButtonTrigger trigger = button_tracker_flush(power_tracker, monotonic_ms(), 280);
     if (trigger != BUTTON_TRIGGER_NONE) {
         emit_button_action(
             display, config, KEYMAP_BUTTON_POWER, "power", trigger,
-            keys, dry_run, 0
+            keys, sequence, dry_run, 0
         );
     }
 }
@@ -409,6 +438,7 @@ static void handle_evdev_key_event(
     ButtonTracker *back_tracker,
     const KeymapConfig *config,
     const OutputKeycodes *keys,
+    CommandSequenceState *sequence,
     bool *tv_chord_pending,
     uint64_t *tv_chord_deadline_ms,
     bool *consume_direction_release,
@@ -481,7 +511,7 @@ static void handle_evdev_key_event(
             if (trigger != BUTTON_TRIGGER_NONE) {
                 emit_button_action(
                     display, config, KEYMAP_BUTTON_POWER, "power", trigger,
-                    keys, dry_run, 0
+                    keys, sequence, dry_run, 0
                 );
             }
         }
@@ -493,6 +523,7 @@ static void handle_evdev_key_event(
                 display,
                 keymap_config_action(config, KEYMAP_BUTTON_HOME, BUTTON_TRIGGER_SINGLE),
                 keys,
+                sequence,
                 dry_run
             );
         }
@@ -526,15 +557,29 @@ static void handle_evdev_key_event(
             if (trigger != BUTTON_TRIGGER_NONE) {
                 emit_button_action(
                     display, config, KEYMAP_BUTTON_BACK, "back", trigger,
-                    keys, dry_run, native_keycode_for_remote_key(display, KEYCODE_BACK)
+                    keys, sequence, dry_run, native_keycode_for_remote_key(display, KEYCODE_BACK)
                 );
             }
         }
         return;
     }
-    if (code == KEYCODE_OK || code == KEYCODE_UP || code == KEYCODE_DOWN ||
-        code == KEYCODE_VOLUME_UP ||
-        code == KEYCODE_VOLUME_DOWN) {
+    if (code == KEYCODE_VOLUME_UP || code == KEYCODE_VOLUME_DOWN) {
+        KeymapButton button = code == KEYCODE_VOLUME_UP ?
+            KEYMAP_BUTTON_VOLUME_UP : KEYMAP_BUTTON_VOLUME_DOWN;
+        const char *button_name = code == KEYCODE_VOLUME_UP ? "volume_up" : "volume_down";
+        KeyCode native_keycode = native_keycode_for_remote_key(display, code);
+        const char *action = keymap_config_action(config, button, BUTTON_TRIGGER_SINGLE);
+        if (strcmp(action, "native") == 0) {
+            fake_key(display, native_keycode, is_press, dry_run);
+        } else if (is_press) {
+            emit_button_action(
+                display, config, button, button_name, BUTTON_TRIGGER_SINGLE,
+                keys, sequence, dry_run, 0
+            );
+        }
+        return;
+    }
+    if (code == KEYCODE_OK || code == KEYCODE_UP || code == KEYCODE_DOWN) {
         fake_key(display, native_keycode_for_remote_key(display, code), is_press, dry_run);
         return;
     }
@@ -543,12 +588,13 @@ static void handle_evdev_key_event(
 }
 
 static void usage(const char *program) {
-    fprintf(stderr, "Usage: %s [--device-name NAME] [--config PATH] [--dry-run]\n", program);
+    fprintf(stderr, "Usage: %s [--device-name NAME] [--config PATH] [--command-sequence PATH] [--dry-run]\n", program);
 }
 
 int main(int argc, char **argv) {
     const char *wanted_name = NULL;
     const char *config_path = NULL;
+    const char *command_sequence_path = NULL;
     bool dry_run = false;
     for (int index = 1; index < argc; index++) {
         if (strcmp(argv[index], "--dry-run") == 0) {
@@ -557,6 +603,8 @@ int main(int argc, char **argv) {
             config_path = argv[++index];
         } else if (strcmp(argv[index], "--device-name") == 0 && index + 1 < argc) {
             wanted_name = argv[++index];
+        } else if (strcmp(argv[index], "--command-sequence") == 0 && index + 1 < argc) {
+            command_sequence_path = argv[++index];
         } else {
             usage(argv[0]);
             return 2;
@@ -570,6 +618,17 @@ int main(int argc, char **argv) {
         return 0;
     }
     wanted_name = device_name_or_default(wanted_name == NULL ? config.device_name : wanted_name);
+    char default_command_sequence_path[PATH_MAX];
+    if (command_sequence_path == NULL) {
+        const char *home = getenv("HOME");
+        if (home != NULL) {
+            snprintf(default_command_sequence_path, sizeof(default_command_sequence_path),
+                     "%s/.config/xiaomi-remote/command-sequence.conf", home);
+            command_sequence_path = default_command_sequence_path;
+        }
+    }
+    CommandSequenceState command_sequence;
+    command_sequence_state_init(&command_sequence, command_sequence_path);
 
     Display *display = XOpenDisplay(NULL);
     if (display == NULL) {
@@ -621,12 +680,12 @@ int main(int argc, char **argv) {
         button_tracker_init(&back_tracker);
 
         while (!stop_requested) {
-            flush_power(display, &config, &power_tracker, &output_keys, dry_run);
+            flush_power(display, &config, &power_tracker, &output_keys, &command_sequence, dry_run);
             ButtonTrigger back_trigger = button_tracker_flush(&back_tracker, monotonic_ms(), 280);
             if (back_trigger != BUTTON_TRIGGER_NONE) {
                 emit_button_action(
                     display, &config, KEYMAP_BUTTON_BACK, "back", back_trigger,
-                    &output_keys, dry_run, (KeyCode)KEYCODE_BACK
+                    &output_keys, &command_sequence, dry_run, (KeyCode)KEYCODE_BACK
                 );
             }
             if (menu_chord_pending && !chord_window_active(monotonic_ms(), menu_chord_deadline_ms)) {
@@ -667,6 +726,7 @@ int main(int argc, char **argv) {
                         &back_tracker,
                         &config,
                         &output_keys,
+                        &command_sequence,
                         &tv_chord_pending,
                         &tv_chord_deadline_ms,
                         &consume_direction_release,

@@ -30,6 +30,9 @@ KeySym key_sym_for_name(const char *name) {
     if (strcmp(name, "Esc") == 0 || strcmp(name, "Escape") == 0) {
         return XK_Escape;
     }
+    if (strcmp(name, "Backspace") == 0 || strcmp(name, "BackSpace") == 0) {
+        return XK_BackSpace;
+    }
     if (strcmp(name, "Left") == 0) {
         return XK_Left;
     }

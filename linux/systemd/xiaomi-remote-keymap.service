@@ -4,7 +4,7 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/xiaomi-keymapd --config %h/.config/xiaomi-remote/keymapd.conf --device-name 小米蓝牙语音遥控器
+ExecStart=%h/.local/bin/xiaomi-keymapd --config %h/.config/xiaomi-remote/keymapd.conf --command-sequence %h/.config/xiaomi-remote/command-sequence.conf --device-name 小米蓝牙语音遥控器
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=%h/.Xauthority
 # The daemon waits for evdev nodes and reconnects internally. Restart only

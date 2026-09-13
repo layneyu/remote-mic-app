@@ -19,6 +19,8 @@ int main(void) {
     fputs("back.single=key:Tab\n", file);
     fputs("back.double=key:Shift+Tab\n", file);
     fputs("home.single=none\n", file);
+    fputs("volume_up.single=command-sequence\n", file);
+    fputs("volume_down.single=key:Backspace\n", file);
     fclose(file);
 
     KeymapConfig config;
@@ -28,6 +30,8 @@ int main(void) {
     assert(strcmp(keymap_config_action(&config, KEYMAP_BUTTON_BACK, BUTTON_TRIGGER_SINGLE), "key:Tab") == 0);
     assert(strcmp(keymap_config_action(&config, KEYMAP_BUTTON_BACK, BUTTON_TRIGGER_DOUBLE), "key:Shift+Tab") == 0);
     assert(strcmp(keymap_config_action(&config, KEYMAP_BUTTON_HOME, BUTTON_TRIGGER_SINGLE), "none") == 0);
+    assert(strcmp(keymap_config_action(&config, KEYMAP_BUTTON_VOLUME_UP, BUTTON_TRIGGER_SINGLE), "command-sequence") == 0);
+    assert(strcmp(keymap_config_action(&config, KEYMAP_BUTTON_VOLUME_DOWN, BUTTON_TRIGGER_SINGLE), "key:Backspace") == 0);
     assert(strcmp(keymap_config_action(&config, KEYMAP_BUTTON_MENU, BUTTON_TRIGGER_SINGLE), "super") == 0);
     assert(strcmp(keymap_config_action(&config, KEYMAP_BUTTON_TV, BUTTON_TRIGGER_SINGLE), "workspace-layer") == 0);
 
